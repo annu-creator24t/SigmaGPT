@@ -8,7 +8,7 @@ import {
 } from "../utils/firebase.js";
 
 
-function Login() {
+function Login({ onContinueAsGuest }) {
   const [isRegister, setIsRegister]         = useState(false);
   const [email, setEmail]                   = useState("");
   const [password, setPassword]             = useState("");
@@ -24,6 +24,17 @@ function Login() {
       await signInWithGoogle();
     } catch (err) {
       setError("Google sign-in failed. Try again.");
+    }
+    setLoading(false);
+  };
+
+  const handleContinueAsGuest = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await onContinueAsGuest?.();
+    } catch {
+      setError("Unable to continue as guest. Try again.");
     }
     setLoading(false);
   };
@@ -118,6 +129,10 @@ function Login() {
         <button className="googleBtn" onClick={handleGoogle} disabled={loading}>
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
           Continue with Google
+        </button>
+
+        <button type="button" className="guestBtn" onClick={handleContinueAsGuest} disabled={loading}>
+          Continue as Guest
         </button>
 
         <div className="loginDivider"><span>or</span></div>

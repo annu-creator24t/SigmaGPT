@@ -2,7 +2,7 @@ import "./Sidebar.css";
 import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import { MyContext } from "../context/MyContext.jsx";
 import toast from "react-hot-toast";
-import { getIdToken, logOut } from "../utils/firebase.js";
+import { getAuthHeaders, signOutCurrentSession } from "../utils/authSession.js";
 import {
   Plus, Search, Pin, PinOff, Pencil, Trash2, Check, X,
   Bot, Code2, PenLine, Lightbulb, GraduationCap,
@@ -10,9 +10,12 @@ import {
   MessageSquare, LogOut,
 } from "lucide-react";
 
-const API_URL     = import.meta.env.VITE_API_URL;
+const API_URL     = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const THREADS_URL = `${API_URL}/api/chat/threads`;
 const THREAD_URL  = (id) => `${API_URL}/api/chat/threads/${id}`;
+
+const hasAuthHeaders = (headers) =>
+  Boolean(headers.Authorization || headers["X-Guest-Id"]);
 
 const PERSONAS = [
   { id: "general",   name: "SigmaGPT",        icon: <Bot size={15} /> },
@@ -130,11 +133,15 @@ function Sidebar() {
   const fetchThreads = useCallback(async () => {
     setIsLoading(true);
     try {
-      const token = await getIdToken();
-      if (!token) { setThreads([]); setIsLoading(false); return; }
+      const headers = await getAuthHeaders();
+      if (!hasAuthHeaders(headers)) {
+        setThreads([]);
+        setIsLoading(false);
+        return;
+      }
 
       const res = await fetch(THREADS_URL, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
       });
 
       if (!res.ok) throw new Error(`Status: ${res.status}`);
@@ -186,10 +193,10 @@ const handleDelete = async (e, threadId) => {
   setThreads(prev => prev.filter(t => t.threadId !== threadId));
 
   try {
-    const token = await getIdToken();
+    const headers = await getAuthHeaders();
     const res = await fetch(THREAD_URL(threadId), {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
     });
     if (!res.ok) throw new Error();
     toast.success("Chat deleted!");
@@ -213,10 +220,10 @@ const handleDelete = async (e, threadId) => {
   );
 
   try {
-    const token = await getIdToken();
+    const headers = await getAuthHeaders();
     const res = await fetch(`${THREAD_URL(threadId)}/pin`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
     });
     if (!res.ok) throw new Error();
     const data = await res.json();
@@ -257,10 +264,10 @@ const handleDelete = async (e, threadId) => {
   }
 
   try {
-    const token = await getIdToken();
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const res = await fetch(`${THREAD_URL(threadId)}/rename`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers,
       body: JSON.stringify({ title: newTitle }),
     });
     if (!res.ok) throw new Error();
@@ -276,7 +283,7 @@ const handleDelete = async (e, threadId) => {
 
   // ✅ Sign out
   const handleSignOut = async () => {
-    try { await logOut(); toast.success("Signed out!"); }
+    try { await signOutCurrentSession(); toast.success("Signed out!"); }
     catch { toast.error("Sign out failed!"); }
   };
 
@@ -302,6 +309,8 @@ const handleDelete = async (e, threadId) => {
 
   // ✅ Collapsed
   if (!isSidebarOpen) {
+    if (isMobile) return null;
+
     return (
       <aside className="sidebar collapsed">
         <button className="collapseBtn" onClick={() => setIsSidebarOpen(true)}>

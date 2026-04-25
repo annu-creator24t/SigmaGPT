@@ -5,7 +5,12 @@ import Sidebar from "./components/Sidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import Login from "./pages/Login.jsx";
 import { MyContext } from "./context/MyContext.jsx";
-import { auth, logOut, onAuthChange } from "./utils/firebase.js";
+import {
+  continueAsGuest,
+  getSessionUser,
+  onSessionAuthChange,
+  signOutCurrentSession,
+} from "./utils/authSession.js";
 import {
   createChat,
   createSessionChat,
@@ -56,7 +61,7 @@ function AuthGate({ children }) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthChange((u) => {
+    const unsubscribe = onSessionAuthChange((u) => {
       setUser(u);
       setChecking(false);
     });
@@ -72,7 +77,17 @@ function AuthGate({ children }) {
     );
   }
 
-  if (!user) return <Login />;
+  if (!user) {
+    return (
+      <Login
+        onContinueAsGuest={async () => {
+          const guestUser = await continueAsGuest();
+          setUser(guestUser);
+          setChecking(false);
+        }}
+      />
+    );
+  }
 
   return children;
 }
@@ -85,10 +100,10 @@ function AppShell() {
   const themeRippleTimerRef   = useRef(null);
 
   // ✅ Current Firebase user
-  const [currentUser, setCurrentUser] = useState(auth.currentUser);
+  const [currentUser, setCurrentUser] = useState(getSessionUser());
 
   useEffect(() => {
-    const unsubscribe = onAuthChange(setCurrentUser);
+    const unsubscribe = onSessionAuthChange(setCurrentUser);
     return unsubscribe;
   }, []);
 
@@ -223,7 +238,7 @@ function AppShell() {
 
   // ✅ Handle sign out
   const handleSignOut = async () => {
-    try { await logOut(); } catch {}
+    try { await signOutCurrentSession(); } catch {}
   };
 
   useEffect(() => {

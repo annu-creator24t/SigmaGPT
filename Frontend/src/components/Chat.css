@@ -125,6 +125,7 @@
 /* ── Bubbles ── */
 .bubble {
   max-width: 72%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -155,6 +156,7 @@
   line-height: 1.65;
   border: 1px solid var(--border);
   word-break: break-word;
+  overflow-wrap: anywhere;
   position: relative;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
 }
@@ -190,7 +192,17 @@
   text-align: left;
 }
 .markdownBody th { background: var(--bg-input); font-weight: 600; }
-.markdownBody a  { color: var(--accent-light); }
+.markdownBody a  { color: var(--accent-light); word-break: break-all; overflow-wrap: anywhere; }
+
+.markdownBody img {
+  width: min(100%, 420px);
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  object-fit: contain;
+  margin: 8px 0;
+}
 
 /* ── Inline code ── */
 .inlineCode {
@@ -315,6 +327,10 @@
   .assistantBubble .markdownBody,
   .userBubble .userText {
     font-size: 0.92rem;
+  }
+  .markdownBody img {
+    width: 100%;
+    max-width: 100%;
   }
   .avatar {
     width: 28px;

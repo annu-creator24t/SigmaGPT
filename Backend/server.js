@@ -5,7 +5,7 @@ import chatRoutes from "./routes/chat.js";
 import { authMiddleware } from "./middleware/auth.js";
 
 const app  = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -23,7 +23,7 @@ app.use(cors({
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Auth-Mode", "X-Guest-Id"],
 }));
 
 app.use(express.json({ limit: "1mb" }));

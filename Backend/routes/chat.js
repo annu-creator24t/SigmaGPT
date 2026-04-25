@@ -4,8 +4,52 @@ import {
   getChatResponse,
   generateChatTitle,
 } from "../utils/groq.js";
+import {
+  ALLOWED_MODELS,
+  ALLOWED_RATIOS,
+  DEFAULT_MODEL,
+  DEFAULT_RATIO,
+  generateImageFromText,
+} from "../utils/image.js";
 
 const router = express.Router();
+
+const memoryThreads = new Map();
+
+const createThreadId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `thread_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
+};
+
+const getMemoryThread = (threadId) => memoryThreads.get(threadId) || null;
+
+const listMemoryThreadsByUser = (userId) =>
+  Array.from(memoryThreads.values())
+    .filter((thread) => thread.userId === userId)
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+const sanitizeMemoryThread = (thread) => ({
+  threadId: thread.threadId,
+  title: thread.title,
+  userId: thread.userId,
+  persona: thread.persona,
+  model: thread.model,
+  pinned: thread.pinned,
+  createdAt: thread.createdAt,
+  updatedAt: thread.updatedAt,
+});
+
+const normalizeImageModel = (model) =>
+  ALLOWED_MODELS.has(String(model || "").trim())
+    ? String(model).trim()
+    : DEFAULT_MODEL;
+
+const normalizeImageRatio = (ratio) =>
+  ALLOWED_RATIOS.has(String(ratio || "").trim())
+    ? String(ratio).trim()
+    : DEFAULT_RATIO;
 
 // ═══════════════════════════════════════
 // GET /api/chat/threads
@@ -13,6 +57,11 @@ const router = express.Router();
 router.get("/threads", async (req, res) => {
   try {
     const userId = req.user.uid;
+
+    if (!db) {
+      const threads = listMemoryThreadsByUser(userId).map(sanitizeMemoryThread);
+      return res.json(threads);
+    }
 
     const snapshot = await db
       .collection("threads")
@@ -41,6 +90,17 @@ router.get("/threads/:threadId", async (req, res) => {
   try {
     const { threadId } = req.params;
     const userId = req.user.uid;
+
+    if (!db) {
+      const thread = getMemoryThread(threadId);
+      if (!thread) return res.status(404).json({ error: "Thread not found" });
+      if (thread.userId !== userId) return res.status(403).json({ error: "Access denied" });
+
+      return res.json({
+        ...sanitizeMemoryThread(thread),
+        messages: thread.messages,
+      });
+    }
 
     const threadDoc = await db.collection("threads").doc(threadId).get();
 
@@ -83,6 +143,73 @@ router.post("/chat", async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+
+    if (!db) {
+      let currentThreadId = threadId;
+
+      if (!currentThreadId) {
+        currentThreadId = createThreadId();
+        const title = await generateChatTitle(message);
+        const now = new Date().toISOString();
+        memoryThreads.set(currentThreadId, {
+          threadId: currentThreadId,
+          title,
+          userId,
+          persona,
+          model,
+          pinned: false,
+          createdAt: now,
+          updatedAt: now,
+          messages: [],
+        });
+      }
+
+      const thread = getMemoryThread(currentThreadId);
+      if (!thread) {
+        const title = await generateChatTitle(message);
+        const now = new Date().toISOString();
+        memoryThreads.set(currentThreadId, {
+          threadId: currentThreadId,
+          title,
+          userId,
+          persona,
+          model,
+          pinned: false,
+          createdAt: now,
+          updatedAt: now,
+          messages: [],
+        });
+      } else if (thread.userId !== userId) {
+        res.write(`data: ${JSON.stringify({ error: "Access denied" })}\n\n`);
+        return res.end();
+      }
+
+      const activeThread = getMemoryThread(currentThreadId);
+      activeThread.persona = persona;
+      activeThread.model = model;
+      activeThread.messages.push({
+        role: "user",
+        content: message,
+        timestamp: new Date().toISOString(),
+      });
+
+      const history = activeThread.messages.map((entry) => ({ role: entry.role, content: entry.content }));
+      const result = await getChatResponse(history, persona, model);
+      const fullResponse = result.content;
+
+      res.write(`data: ${JSON.stringify({ chunk: fullResponse })}\n\n`);
+
+      activeThread.messages.push({
+        role: "assistant",
+        content: fullResponse,
+        timestamp: new Date().toISOString(),
+        persona,
+      });
+      activeThread.updatedAt = new Date().toISOString();
+
+      res.write(`data: ${JSON.stringify({ done: true, threadId: currentThreadId })}\n\n`);
+      return res.end();
+    }
 
     let currentThreadId = threadId;
 
@@ -186,6 +313,175 @@ router.post("/title", async (req, res) => {
 });
 
 // ═══════════════════════════════════════
+// POST /api/chat/image
+// ═══════════════════════════════════════
+router.post("/image", async (req, res) => {
+  try {
+    const {
+      prompt,
+      threadId,
+      model = DEFAULT_MODEL,
+      ratio = DEFAULT_RATIO,
+    } = req.body;
+    const userId = req.user.uid;
+
+    if (!String(prompt || "").trim()) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
+
+    const selectedModel = normalizeImageModel(model);
+    const selectedRatio = normalizeImageRatio(ratio);
+
+    const imageResult = await generateImageFromText({
+      prompt,
+      model: selectedModel,
+      ratio: selectedRatio,
+    });
+
+    const assistantMessage = [
+      `Generated image (${selectedModel}, ${selectedRatio}):`,
+      "",
+      `![Generated image](${imageResult.imageUrl})`,
+      "",
+      `[Open image](${imageResult.imageUrl})`,
+    ].join("\n");
+
+    if (!db) {
+      let currentThreadId = threadId;
+      const now = new Date().toISOString();
+
+      if (!currentThreadId) {
+        currentThreadId = createThreadId();
+        const title = await generateChatTitle(prompt);
+        memoryThreads.set(currentThreadId, {
+          threadId: currentThreadId,
+          title,
+          userId,
+          persona: "general",
+          model: "image",
+          pinned: false,
+          createdAt: now,
+          updatedAt: now,
+          messages: [],
+        });
+      }
+
+      const thread = getMemoryThread(currentThreadId);
+      if (!thread) {
+        const title = await generateChatTitle(prompt);
+        memoryThreads.set(currentThreadId, {
+          threadId: currentThreadId,
+          title,
+          userId,
+          persona: "general",
+          model: "image",
+          pinned: false,
+          createdAt: now,
+          updatedAt: now,
+          messages: [],
+        });
+      } else if (thread.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const activeThread = getMemoryThread(currentThreadId);
+      activeThread.messages.push({
+        role: "user",
+        content: String(prompt).trim(),
+        timestamp: new Date().toISOString(),
+      });
+      activeThread.messages.push({
+        role: "assistant",
+        content: assistantMessage,
+        timestamp: new Date().toISOString(),
+        persona: "image",
+        imageUrl: imageResult.imageUrl,
+      });
+      activeThread.updatedAt = new Date().toISOString();
+
+      return res.json({
+        success: true,
+        threadId: currentThreadId,
+        imageUrl: imageResult.imageUrl,
+        urls: imageResult.urls,
+        jobId: imageResult.jobId,
+        taskUrl: imageResult.taskUrl,
+        model: selectedModel,
+        ratio: selectedRatio,
+        content: assistantMessage,
+      });
+    }
+
+    let currentThreadId = threadId;
+    if (!currentThreadId) {
+      const newThreadRef = db.collection("threads").doc();
+      currentThreadId = newThreadRef.id;
+      const title = await generateChatTitle(prompt);
+      await newThreadRef.set({
+        title,
+        userId,
+        persona: "general",
+        model: "image",
+        pinned: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      const threadDoc = await db.collection("threads").doc(currentThreadId).get();
+      if (!threadDoc.exists) {
+        const title = await generateChatTitle(prompt);
+        await db.collection("threads").doc(currentThreadId).set({
+          title,
+          userId,
+          persona: "general",
+          model: "image",
+          pinned: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (threadDoc.data().userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
+    await db.collection("threads").doc(currentThreadId)
+      .collection("messages").add({
+        role: "user",
+        content: String(prompt).trim(),
+        timestamp: new Date().toISOString(),
+      });
+
+    await db.collection("threads").doc(currentThreadId)
+      .collection("messages").add({
+        role: "assistant",
+        content: assistantMessage,
+        timestamp: new Date().toISOString(),
+        persona: "image",
+        imageUrl: imageResult.imageUrl,
+      });
+
+    await db.collection("threads").doc(currentThreadId).update({
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json({
+      success: true,
+      threadId: currentThreadId,
+      imageUrl: imageResult.imageUrl,
+      urls: imageResult.urls,
+      jobId: imageResult.jobId,
+      taskUrl: imageResult.taskUrl,
+      model: selectedModel,
+      ratio: selectedRatio,
+      content: assistantMessage,
+    });
+  } catch (error) {
+    console.error("❌ Image error:", error.message);
+    res.status(500).json({ error: error.message || "Failed to generate image" });
+  }
+});
+
+// ═══════════════════════════════════════
 // PUT /api/chat/threads/:threadId/rename
 // ═══════════════════════════════════════
 router.put("/threads/:threadId/rename", async (req, res) => {
@@ -193,6 +489,17 @@ router.put("/threads/:threadId/rename", async (req, res) => {
     const { threadId } = req.params;
     const { title }    = req.body;
     const userId       = req.user.uid;
+
+    if (!db) {
+      const thread = getMemoryThread(threadId);
+      if (!thread) return res.status(404).json({ error: "Thread not found" });
+      if (thread.userId !== userId) return res.status(403).json({ error: "Access denied" });
+      if (!title?.trim()) return res.status(400).json({ error: "Title required" });
+
+      thread.title = title.trim();
+      thread.updatedAt = new Date().toISOString();
+      return res.json({ success: true, title: thread.title });
+    }
 
     const threadRef = db.collection("threads").doc(threadId);
     const threadDoc = await threadRef.get();
@@ -217,6 +524,16 @@ router.put("/threads/:threadId/pin", async (req, res) => {
     const { threadId } = req.params;
     const userId = req.user.uid;
 
+    if (!db) {
+      const thread = getMemoryThread(threadId);
+      if (!thread) return res.status(404).json({ error: "Thread not found" });
+      if (thread.userId !== userId) return res.status(403).json({ error: "Access denied" });
+
+      thread.pinned = !thread.pinned;
+      thread.updatedAt = new Date().toISOString();
+      return res.json({ success: true, pinned: thread.pinned });
+    }
+
     const threadRef = db.collection("threads").doc(threadId);
     const threadDoc = await threadRef.get();
 
@@ -239,6 +556,15 @@ router.delete("/threads/:threadId", async (req, res) => {
   try {
     const { threadId } = req.params;
     const userId = req.user.uid;
+
+    if (!db) {
+      const thread = getMemoryThread(threadId);
+      if (!thread) return res.status(404).json({ error: "Thread not found" });
+      if (thread.userId !== userId) return res.status(403).json({ error: "Access denied" });
+
+      memoryThreads.delete(threadId);
+      return res.json({ success: true, message: "Thread deleted" });
+    }
 
     const threadRef = db.collection("threads").doc(threadId);
     const threadDoc = await threadRef.get();
@@ -266,6 +592,13 @@ router.delete("/threads/:threadId", async (req, res) => {
 router.delete("/threads", async (req, res) => {
   try {
     const userId   = req.user.uid;
+
+    if (!db) {
+      const toDelete = listMemoryThreadsByUser(userId);
+      toDelete.forEach((thread) => memoryThreads.delete(thread.threadId));
+      return res.json({ success: true, message: "All your threads cleared" });
+    }
+
     const snapshot = await db.collection("threads")
       .where("userId", "==", userId)
       .get();

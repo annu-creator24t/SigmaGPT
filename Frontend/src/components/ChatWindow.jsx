@@ -9,11 +9,35 @@ import {
   MoreVertical, Trash2, RefreshCw, Menu,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
-import { getIdToken } from "../utils/firebase.js";
+import { getAuthHeaders } from "../utils/authSession.js";
+import { requestTextToImage } from "../utils/aiClient.js";
 
-const API_BASE   = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_BASE   = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const CHAT_URL   = `${API_BASE}/api/chat/chat`;
 const THREADS_URL = `${API_BASE}/api/chat/threads`;
+
+const hasAuthHeaders = (headers) =>
+  Boolean(headers.Authorization || headers["X-Guest-Id"]);
+
+const IMAGE_MODEL = "nano-banana-2";
+const IMAGE_RATIO = "9:16";
+
+const COMMANDS = [
+  {
+    id: "image",
+    command: "/image",
+    description: "Generate an image from text",
+  },
+];
+
+const parseImageCommand = (rawText) => {
+  const text = String(rawText || "").trim();
+  if (!text.toLowerCase().startsWith("/image")) return null;
+
+  return {
+    prompt: text.slice(6).trim(),
+  };
+};
 
 function ChatWindow() {
   const {
@@ -38,6 +62,9 @@ function ChatWindow() {
   const inputRef       = useRef(null);
   const recognitionRef = useRef(null);
 
+  const trimmedPrompt = prompt.trimStart();
+  const showCommandSuggestions = trimmedPrompt.startsWith("/") && !trimmedPrompt.startsWith("/image");
+
   // ✅ Auto scroll to bottom
   useEffect(() => {
     if (chatBodyRef.current) {
@@ -48,8 +75,80 @@ function ChatWindow() {
   // ✅ Send message with streaming
   const getReply = async (overridePrompt) => {
     const text = (overridePrompt || prompt).trim();
+    const imageCommand = parseImageCommand(text);
     if (!text || isLoading) return;
     if (!isOnline) { toast.error("You're offline!"); return; }
+
+    if (imageCommand) {
+      if (!imageCommand.prompt) {
+        toast.error("Usage: /image your prompt");
+        return;
+      }
+
+      setIsLoading(true);
+      setIsNewChat(false);
+      setPrompt("");
+
+      setPrevChats(prev => [
+        ...prev,
+        { role: "user", content: text, timestamp: new Date().toISOString() },
+        { role: "assistant", content: "Generating image...", timestamp: new Date().toISOString(), persona: "image" },
+      ]);
+
+      try {
+        const result = await requestTextToImage({
+          prompt: imageCommand.prompt,
+          threadId: currThreadId,
+          model: IMAGE_MODEL,
+          ratio: IMAGE_RATIO,
+        });
+
+        const content = result.content || [
+          `Generated image (${result.model || IMAGE_MODEL}, ${result.ratio || IMAGE_RATIO}):`,
+          "",
+          `![Generated image](${result.imageUrl})`,
+          "",
+          `[Open image](${result.imageUrl})`,
+        ].join("\n");
+
+        setPrevChats(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content,
+            persona: "image",
+          };
+          return updated;
+        });
+
+        try {
+          const threadHeaders = await getAuthHeaders();
+          const res = await fetch(THREADS_URL, { headers: threadHeaders });
+          if (res.ok) {
+            const threads = await res.json();
+            setAllThreads(Array.isArray(threads) ? threads : []);
+          }
+        } catch {}
+
+        toast.success("Image generated!");
+      } catch (err) {
+        const message = err?.message || "Image generation failed";
+        setPrevChats(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: `Image generation failed: ${message}`,
+            persona: "image",
+          };
+          return updated;
+        });
+        toast.error(message);
+      }
+
+      setIsLoading(false);
+      inputRef.current?.focus();
+      return;
+    }
 
     setIsLoading(true);
     setIsNewChat(false);
@@ -63,15 +162,17 @@ function ChatWindow() {
     ]);
 
     try {
-      const token = await getIdToken();
+      const headers = await getAuthHeaders({
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      });
+      if (!hasAuthHeaders(headers)) {
+        throw new Error("No auth session");
+      }
 
       const response = await fetch(CHAT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "text/event-stream",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
           message: text,
           threadId: currThreadId,
@@ -110,8 +211,8 @@ function ChatWindow() {
 
             if (data.done) {
               try {
-                const t = await getIdToken();
-                const res = await fetch(THREADS_URL, { headers: { Authorization: `Bearer ${t}` } });
+                const threadHeaders = await getAuthHeaders();
+                const res = await fetch(THREADS_URL, { headers: threadHeaders });
                 if (res.ok) {
                   const threads = await res.json();
                   setAllThreads(Array.isArray(threads) ? threads : []);
@@ -224,8 +325,8 @@ function ChatWindow() {
     setShowMoreMenu(false);
     if (!window.confirm("Clear all chats? This cannot be undone.")) return;
     try {
-      const token = await getIdToken();
-      await fetch(THREADS_URL, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const headers = await getAuthHeaders();
+      await fetch(THREADS_URL, { method: "DELETE", headers });
       startNewChat();
       setAllThreads([]);
       toast.success("All chats cleared!");
@@ -356,8 +457,27 @@ function ChatWindow() {
           </button>
         </div>
 
+        {showCommandSuggestions && (
+          <div className="commandSuggestions" role="listbox" aria-label="Command suggestions">
+            {COMMANDS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="commandSuggestionBtn"
+                onClick={() => {
+                  setPrompt(`${item.command} `);
+                  requestAnimationFrame(() => inputRef.current?.focus());
+                }}
+              >
+                <span className="commandSuggestionCmd">{item.command}</span>
+                <span className="commandSuggestionDesc">{item.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <p className="inputHint">
-          Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line · SigmaGPT can make mistakes
+          Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line · Type <kbd>/</kbd> for commands · <kbd>/image</kbd> uses nano-banana-2 (9:16)
         </p>
       </div>
     </div>

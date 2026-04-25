@@ -1,10 +1,14 @@
-import { getIdToken } from "./firebase.js";
+import { getAuthHeaders } from "./authSession.js";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const hasAuthHeaders = (headers) =>
+  Boolean(headers.Authorization || headers["X-Guest-Id"]);
 
 // ✅ Helper — makes authenticated POST requests
 const postJson = async (path, body) => {
-  const token = await getIdToken();
+  const authHeaders = await getAuthHeaders();
+  if (!hasAuthHeaders(authHeaders)) throw new Error("You must sign in or continue as guest.");
 
   let response;
   try {
@@ -13,8 +17,7 @@ const postJson = async (path, body) => {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        // ✅ Send Firebase token so backend knows who this is
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...authHeaders,
       },
       body: JSON.stringify(body),
     });
@@ -32,12 +35,11 @@ const postJson = async (path, body) => {
 
 // ✅ Helper — authenticated GET
 export const getJson = async (path) => {
-  const token = await getIdToken();
+  const authHeaders = await getAuthHeaders();
+  if (!hasAuthHeaders(authHeaders)) throw new Error("You must sign in or continue as guest.");
 
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers: authHeaders,
   });
 
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
@@ -46,13 +48,14 @@ export const getJson = async (path) => {
 
 // ✅ Helper — authenticated DELETE/PUT
 export const mutateJson = async (path, method = "DELETE", body = null) => {
-  const token = await getIdToken();
+  const authHeaders = await getAuthHeaders();
+  if (!hasAuthHeaders(authHeaders)) throw new Error("You must sign in or continue as guest.");
 
   const response = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...authHeaders,
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -63,14 +66,15 @@ export const mutateJson = async (path, method = "DELETE", body = null) => {
 
 // ✅ Streaming chat request
 export const requestChatStream = async (path, body, onChunk, onDone) => {
-  const token = await getIdToken();
+  const authHeaders = await getAuthHeaders();
+  if (!hasAuthHeaders(authHeaders)) throw new Error("You must sign in or continue as guest.");
 
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...authHeaders,
     },
     body: JSON.stringify(body),
   });
@@ -107,3 +111,6 @@ export const requestChatReply = (messages, persona, model) =>
 
 export const requestChatTitle = (message) =>
   postJson("/api/chat/title", { message });
+
+export const requestTextToImage = ({ prompt, threadId, model, ratio }) =>
+  postJson("/api/chat/image", { prompt, threadId, model, ratio });

@@ -96,6 +96,28 @@
   height: 18px;
 }
 
+.guestBtn {
+  width: 100%;
+  padding: 11px 20px;
+  background: transparent;
+  border: 1px solid rgba(124, 58, 237, 0.5);
+  border-radius: 12px;
+  cursor: pointer;
+  color: #d6bcfa;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  margin-bottom: 12px;
+}
+
+.guestBtn:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.12);
+  border-color: #a78bfa;
+  transform: translateY(-1px);
+}
+
+.guestBtn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
 /* ── Divider ── */
 .loginDivider {
   display: flex;
