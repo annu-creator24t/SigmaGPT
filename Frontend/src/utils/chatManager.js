@@ -60,6 +60,9 @@ const normalizeMessage = (message) => ({
   timestamp: message?.timestamp || now(),
   persona: message?.persona || null,
   model: message?.model || null,
+  isImage: message?.isImage || false,       // ✅ ADD
+  imageUrl: message?.imageUrl || null,      // ✅ ADD
+  isGenerating: message?.isGenerating || false, // ✅ ADD
 });
 
 const normalizeChat = (chat) => ({
