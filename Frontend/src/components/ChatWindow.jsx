@@ -16,13 +16,17 @@ const CHAT_URL    = `${API_BASE}/api/chat/chat`;
 const IMAGE_URL   = `${API_BASE}/api/chat/image`;
 const THREADS_URL = `${API_BASE}/api/chat/threads`;
 
-const IMAGE_MODELS = [
-  { id: "nano-banana-2",    label: "Nano Banana 2" },
-  { id: "flux-pro",         label: "Flux Pro" },
-  { id: "stable-diffusion", label: "Stable Diffusion" },
+// ✅ Image intent keywords — user doesn't need to type /image
+const IMAGE_KEYWORDS = [
+  "/image", "generate image", "generate a image", "generate an image",
+  "create image", "create a image", "create an image",
+  "draw ", "draw a ", "draw an ",
+  "make image", "make a image", "make an image",
+  "show image", "show a ", "paint ",
+  "illustrate", "sketch ", "render ",
+  "generate a photo", "create a photo",
+  "image of ", "picture of ", "photo of ",
 ];
-
-const IMAGE_SIZES = ["1:1", "9:16", "16:9", "4:3", "3:4"];
 
 function ChatWindow() {
   const {
@@ -43,8 +47,6 @@ function ChatWindow() {
 
   const [showExportMenu, setShowExportMenu]       = useState(false);
   const [showMoreMenu, setShowMoreMenu]           = useState(false);
-  const [imageModel, setImageModel]               = useState("nano-banana-2");
-  const [imageSize, setImageSize]                 = useState("9:16");
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const chatBodyRef    = useRef(null);
@@ -57,36 +59,33 @@ function ChatWindow() {
     }
   }, [prevChats, isLoadingConversation]);
 
-  const isImageCommand = prompt.trim().startsWith("/image ");
   const isBusy = isLoading || isGeneratingImage;
 
-  // ✅ Route to image or chat
-const handleSend = async (overridePrompt) => {
-  const text = (overridePrompt || prompt).trim();
-  if (!text || isBusy) return;
+  // ✅ Detect if message is image intent
+  const detectImageIntent = (text) => {
+    const lower = text.toLowerCase();
+    return IMAGE_KEYWORDS.some(kw => lower.startsWith(kw) || lower.includes(kw));
+  };
 
-  // ✅ Check explicit /image command
-  if (text.startsWith("/image ")) {
-    const imagePrompt = text.slice(7).trim();
-    if (!imagePrompt) { toast.error("Add a description after /image"); return; }
-    await generateImage(imagePrompt);
-    return;
-  }
+  // ✅ Get clean image prompt (remove command prefix if any)
+  const getImagePrompt = (text) => {
+    if (text.startsWith("/image ")) return text.slice(7).trim();
+    return text.trim();
+  };
 
-  // ✅ Auto-detect image intent keywords
-  const imageKeywords = ["generate image", "generate a", "create image", "draw ", "make image", "show image", "paint ", "illustrate", "/image"];
-  const lowerText = text.toLowerCase();
-  const isImageIntent = imageKeywords.some(kw => lowerText.includes(kw));
+  // ✅ Main send handler
+  const handleSend = async (overridePrompt) => {
+    const text = (overridePrompt || prompt).trim();
+    if (!text || isBusy) return;
 
-  if (isImageIntent) {
-    await generateImage(text); // use full text as prompt
-    return;
-  }
+    if (detectImageIntent(text)) {
+      await generateImage(getImagePrompt(text));
+    } else {
+      await getReply(text);
+    }
+  };
 
-  await getReply(text);
-};
-
-  // ✅ Image generation
+  // ✅ Image generation using Pollinations AI
   const generateImage = async (imagePrompt) => {
     if (!isOnline) { toast.error("You're offline!"); return; }
     setIsGeneratingImage(true);
@@ -95,7 +94,7 @@ const handleSend = async (overridePrompt) => {
 
     setPrevChats(prev => [
       ...prev,
-      { role: "user", content: `/image ${imagePrompt}`, timestamp: new Date().toISOString() },
+      { role: "user", content: imagePrompt, timestamp: new Date().toISOString() },
       { role: "assistant", content: "", isImage: true, isGenerating: true, timestamp: new Date().toISOString(), persona: "general" },
     ]);
 
@@ -104,7 +103,7 @@ const handleSend = async (overridePrompt) => {
       const res = await fetch(IMAGE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ prompt: imagePrompt, threadId: currThreadId, model: imageModel, size: imageSize }),
+        body: JSON.stringify({ prompt: imagePrompt, threadId: currThreadId }),
       });
 
       const data = await res.json();
@@ -114,7 +113,7 @@ const handleSend = async (overridePrompt) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
           role: "assistant",
-          content: `Generated image (${data.model}, ${data.size}):`,
+          content: `Generated image for: "${imagePrompt}"`,
           imageUrl: data.imageUrl,
           isImage: true,
           isGenerating: false,
@@ -124,6 +123,7 @@ const handleSend = async (overridePrompt) => {
         return updated;
       });
 
+      // Refresh threads
       try {
         const t = await getIdToken();
         const r = await fetch(THREADS_URL, { headers: { Authorization: `Bearer ${t}` } });
@@ -223,7 +223,7 @@ const handleSend = async (overridePrompt) => {
   const exportTXT = () => {
     if (!prevChats.length) { toast.error("No chat to export!"); return; }
     const lines = prevChats.map(c => {
-      const who  = c.role === "user" ? "You" : "SigmaGPT";
+      const who = c.role === "user" ? "You" : "SigmaGPT";
       const time = c.timestamp ? new Date(c.timestamp).toLocaleString() : "";
       const content = c.isImage ? `[Image] ${c.imageUrl || ""}` : c.content;
       return `[${time}] ${who}:\n${content}\n`;
@@ -244,7 +244,7 @@ const handleSend = async (overridePrompt) => {
       const pageW = doc.internal.pageSize.getWidth();
       let y = 20;
       doc.setFontSize(18); doc.setTextColor(124, 58, 237);
-      doc.text("ΣigmaGPT", 20, y); y += 16;
+      doc.text("SigmaGPT", 20, y); y += 16;
       prevChats.forEach(chat => {
         const who = chat.role === "user" ? "You" : "SigmaGPT";
         doc.setFontSize(9); doc.setTextColor(124, 58, 237);
@@ -275,6 +275,7 @@ const handleSend = async (overridePrompt) => {
 
   const currentPersonaName = { general: "SigmaGPT", coder: "Sigma Coder", writer: "Sigma Writer", explainer: "Sigma Simplified", mentor: "Sigma Mentor" }[selectedPersona] || "SigmaGPT";
   const currentModelLabel  = { smart: "Smart", fast: "Fast", balanced: "Balanced" }[selectedModel] || "Smart";
+  const isImageMode = detectImageIntent(prompt);
 
   return (
     <div className="chatWindow">
@@ -294,7 +295,8 @@ const handleSend = async (overridePrompt) => {
 
         <div className="navRight">
           <div className="navDropdownWrap">
-            <button className="navIconBtn" title="Export" onClick={() => { setShowExportMenu(!showExportMenu); setShowMoreMenu(false); }}>
+            <button className="navIconBtn" title="Export"
+              onClick={() => { setShowExportMenu(!showExportMenu); setShowMoreMenu(false); }}>
               <Download size={17} />
             </button>
             {showExportMenu && (
@@ -306,13 +308,18 @@ const handleSend = async (overridePrompt) => {
           </div>
 
           <div className="navDropdownWrap">
-            <button className="navIconBtn" title="More" onClick={() => { setShowMoreMenu(!showMoreMenu); setShowExportMenu(false); }}>
+            <button className="navIconBtn" title="More"
+              onClick={() => { setShowMoreMenu(!showMoreMenu); setShowExportMenu(false); }}>
               <MoreVertical size={17} />
             </button>
             {showMoreMenu && (
               <div className="navDropdown">
-                <button onClick={() => { startNewChat(); setShowMoreMenu(false); }}><RefreshCw size={14} /> New Chat</button>
-                <button className="danger" onClick={clearChat}><Trash2 size={14} /> Clear All Chats</button>
+                <button onClick={() => { startNewChat(); setShowMoreMenu(false); }}>
+                  <RefreshCw size={14} /> New Chat
+                </button>
+                <button className="danger" onClick={clearChat}>
+                  <Trash2 size={14} /> Clear All Chats
+                </button>
               </div>
             )}
           </div>
@@ -320,7 +327,8 @@ const handleSend = async (overridePrompt) => {
       </div>
 
       {/* ── Chat body ── */}
-      <div className="chatBody" ref={chatBodyRef} onClick={() => { setShowExportMenu(false); setShowMoreMenu(false); }}>
+      <div className="chatBody" ref={chatBodyRef}
+        onClick={() => { setShowExportMenu(false); setShowMoreMenu(false); }}>
         {isLoadingConversation ? (
           <div className="chatSkeleton">
             <div className="skeletonLine short" />
@@ -346,28 +354,17 @@ const handleSend = async (overridePrompt) => {
         </div>
       )}
 
-      {/* ── Image settings bar — shows when /image command typed ── */}
-      {isImageCommand && (
+      {/* ── Image mode indicator ── */}
+      {isImageMode && !isBusy && (
         <div className="imageSettingsBar">
-          <span className="imageSettingsLabel">🎨</span>
-          <div className="imageSettingGroup">
-            <label>Model</label>
-            <select value={imageModel} onChange={e => setImageModel(e.target.value)} className="imageSelect">
-              {IMAGE_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
-          </div>
-          <div className="imageSettingGroup">
-            <label>Size</label>
-            <select value={imageSize} onChange={e => setImageSize(e.target.value)} className="imageSelect">
-              {IMAGE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          <Image size={14} />
+          <span>Image generation mode · Powered by Pollinations AI</span>
         </div>
       )}
 
       {/* ── Input area ── */}
       <div className="inputArea">
-        <div className={`inputBox ${isImageCommand ? "imageMode" : ""}`}>
+        <div className={`inputBox ${isImageMode ? "imageMode" : ""}`}>
           <button className={`inputIconBtn ${isListening ? "listening" : ""}`} onClick={toggleVoice}>
             {isListening ? <MicOff size={18} /> : <Mic size={18} />}
           </button>
@@ -375,7 +372,7 @@ const handleSend = async (overridePrompt) => {
           <textarea
             ref={inputRef}
             className="chatTextarea"
-            placeholder={isListening ? "🎙 Listening..." : "Ask anything · Type /image to generate images"}
+            placeholder={isListening ? "🎙 Listening..." : "Ask anything · Say 'draw a cat' or 'generate image of...' for images"}
             value={prompt}
             rows={1}
             onChange={e => {
@@ -387,17 +384,17 @@ const handleSend = async (overridePrompt) => {
           />
 
           <button
-            className={`sendBtn ${prompt.trim() && !isBusy ? "active" : ""} ${isImageCommand ? "imageSendBtn" : ""}`}
+            className={`sendBtn ${prompt.trim() && !isBusy ? "active" : ""} ${isImageMode ? "imageSendBtn" : ""}`}
             onClick={() => handleSend()}
             disabled={!prompt.trim() || isBusy}
-            title={isImageCommand ? "Generate Image" : "Send"}
+            title={isImageMode ? "Generate Image" : "Send"}
           >
-            {isImageCommand ? <Image size={17} /> : <Send size={17} />}
+            {isImageMode ? <Image size={17} /> : <Send size={17} />}
           </button>
         </div>
 
         <p className="inputHint">
-          <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> new line · <kbd>/image</kbd> generate images
+          <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> new line · Say "draw..." or "generate image..." for AI images
         </p>
       </div>
     </div>
