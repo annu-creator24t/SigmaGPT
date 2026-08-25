@@ -22,13 +22,16 @@ function Login({ onContinueAsGuest }) {
     setError("");
     setLoading(true);
     try {
-      await signInWithGoogle();
-      toast.success("Signed in with Google!");
+      const res = await signInWithGoogle();
+      if (res) {
+        toast.success("Signed in with Google!");
+      }
     } catch (err) {
       setError(err?.message || "Google sign-in failed. Try again.");
     }
     setLoading(false);
   };
+
 
   const handleEmailAuth = async (e) => {
     e.preventDefault();

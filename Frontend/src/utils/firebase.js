@@ -23,9 +23,26 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 // ✅ Sign in with Google (email always verified!)
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithGoogle = async () => {
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (err) {
+    if (err.code === "auth/popup-closed-by-user") {
+      throw new Error("Sign-in popup was closed before completing.");
+    }
+    if (err.code === "auth/popup-blocked") {
+      throw new Error("Sign-in popup was blocked by browser. Please allow popups.");
+    }
+    if (err.code === "auth/cancelled-popup-request") {
+      return null;
+    }
+    throw err;
+  }
+};
+
 
 // ✅ Sign in with Email/Password
 export const signInWithEmail = async (email, password) => {
