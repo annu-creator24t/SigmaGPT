@@ -13,8 +13,7 @@ const postJson = async (path, body) => {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        // ✅ Send Firebase token so backend knows who this is
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : { Authorization: "Bearer guest", "x-guest-user": "true" }),
       },
       body: JSON.stringify(body),
     });
@@ -36,7 +35,7 @@ export const getJson = async (path) => {
 
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : { Authorization: "Bearer guest", "x-guest-user": "true" }),
     },
   });
 
@@ -52,7 +51,7 @@ export const mutateJson = async (path, method = "DELETE", body = null) => {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : { Authorization: "Bearer guest", "x-guest-user": "true" }),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -70,10 +69,11 @@ export const requestChatStream = async (path, body, onChunk, onDone) => {
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : { Authorization: "Bearer guest", "x-guest-user": "true" }),
     },
     body: JSON.stringify(body),
   });
+
 
   if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
