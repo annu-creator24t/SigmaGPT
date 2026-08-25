@@ -91,7 +91,7 @@ export const getImagePrompt = (text = "") => {
  */
 export const buildPollinationsUrl = (prompt, width = 1024, height = 1024) => {
   const seed = Math.floor(Math.random() * 1000000);
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
 };
 
 /**
