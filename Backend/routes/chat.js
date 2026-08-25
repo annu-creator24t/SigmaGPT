@@ -52,7 +52,8 @@ router.post("/image", async (req, res) => {
 
     // ✅ Pollinations AI — completely free, no API key!
     const seed = Math.floor(Math.random() * 1000000);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
+
 
     // ✅ Save to Firestore only for authenticated non-guest users with threadId
     if (!isGuest && threadId && db) {
