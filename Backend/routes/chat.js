@@ -190,12 +190,17 @@ router.put("/threads/:threadId/rename", async (req, res) => {
   try {
     const { threadId } = req.params;
     const { title } = req.body;
+    if (!title?.trim()) return res.status(400).json({ error: "Title required" });
+
+    if (req.user?.isGuest) {
+      return res.json({ success: true, title: title.trim() });
+    }
+
     const userId = req.user.uid;
     const threadRef = db.collection("threads").doc(threadId);
     const threadDoc = await threadRef.get();
     if (!threadDoc.exists) return res.status(404).json({ error: "Thread not found" });
     if (threadDoc.data().userId !== userId) return res.status(403).json({ error: "Access denied" });
-    if (!title?.trim()) return res.status(400).json({ error: "Title required" });
     await threadRef.update({ title: title.trim(), updatedAt: new Date().toISOString() });
     res.json({ success: true, title: title.trim() });
   } catch (error) {
@@ -206,6 +211,11 @@ router.put("/threads/:threadId/rename", async (req, res) => {
 router.put("/threads/:threadId/pin", async (req, res) => {
   try {
     const { threadId } = req.params;
+
+    if (req.user?.isGuest) {
+      return res.json({ success: true, pinned: Boolean(req.body?.pinned) });
+    }
+
     const userId = req.user.uid;
     const threadRef = db.collection("threads").doc(threadId);
     const threadDoc = await threadRef.get();
@@ -222,6 +232,11 @@ router.put("/threads/:threadId/pin", async (req, res) => {
 router.delete("/threads/:threadId", async (req, res) => {
   try {
     const { threadId } = req.params;
+
+    if (req.user?.isGuest) {
+      return res.json({ success: true, message: "Thread deleted" });
+    }
+
     const userId = req.user.uid;
     const threadRef = db.collection("threads").doc(threadId);
     const threadDoc = await threadRef.get();
@@ -240,6 +255,10 @@ router.delete("/threads/:threadId", async (req, res) => {
 
 router.delete("/threads", async (req, res) => {
   try {
+    if (req.user?.isGuest) {
+      return res.json({ success: true, message: "All your threads cleared" });
+    }
+
     const userId = req.user.uid;
     const snapshot = await db.collection("threads").where("userId", "==", userId).get();
     const batch = db.batch();
