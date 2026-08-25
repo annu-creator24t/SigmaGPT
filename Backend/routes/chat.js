@@ -6,6 +6,9 @@ const router = express.Router();
 
 router.get("/threads", async (req, res) => {
   try {
+    if (req.user?.isGuest) {
+      return res.json([]);
+    }
     const userId = req.user.uid;
     const snapshot = await db.collection("threads").where("userId", "==", userId).get();
     const threads = [];
@@ -20,6 +23,9 @@ router.get("/threads", async (req, res) => {
 
 router.get("/threads/:threadId", async (req, res) => {
   try {
+    if (req.user?.isGuest) {
+      return res.status(404).json({ error: "Guest threads are stored client-side" });
+    }
     const { threadId } = req.params;
     const userId = req.user.uid;
     const threadDoc = await db.collection("threads").doc(threadId).get();
@@ -39,52 +45,53 @@ router.get("/threads/:threadId", async (req, res) => {
 router.post("/image", async (req, res) => {
   try {
     const { prompt, threadId, width = 1024, height = 1024 } = req.body;
-    const userId = req.user.uid;
+    const isGuest = Boolean(req.user?.isGuest);
+    const userId = req.user?.uid;
 
     if (!prompt?.trim()) return res.status(400).json({ error: "Prompt is required" });
 
     // ✅ Pollinations AI — completely free, no API key!
     const seed = Math.floor(Math.random() * 1000000);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.trim())}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
 
-    // ✅ Verify image is accessible
-    const checkResponse = await fetch(imageUrl, { method: "HEAD" });
-    if (!checkResponse.ok) throw new Error("Image generation failed");
+    // ✅ Save to Firestore only for authenticated non-guest users with threadId
+    if (!isGuest && threadId && db) {
+      try {
+        const threadDoc = await db.collection("threads").doc(threadId).get();
+        if (!threadDoc.exists) {
+          const title = await generateChatTitle(prompt);
+          await db.collection("threads").doc(threadId).set({
+            title, userId, persona: "general", model: "smart",
+            pinned: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
 
-    // ✅ Save to Firestore
-    if (threadId) {
-      const threadDoc = await db.collection("threads").doc(threadId).get();
-      if (!threadDoc.exists) {
-        const title = await generateChatTitle(prompt);
-        await db.collection("threads").doc(threadId).set({
-          title, userId, persona: "general", model: "smart",
-          pinned: false,
-          createdAt: new Date().toISOString(),
+        await db.collection("threads").doc(threadId).collection("messages").add({
+          role: "user",
+          content: `/image ${prompt}`,
+          timestamp: new Date().toISOString(),
+        });
+
+        await db.collection("threads").doc(threadId).collection("messages").add({
+          role: "assistant",
+          content: `Generated image for: "${prompt}"`,
+          imageUrl,
+          isImage: true,
+          timestamp: new Date().toISOString(),
+          persona: "general",
+        });
+
+        await db.collection("threads").doc(threadId).update({
           updatedAt: new Date().toISOString(),
         });
+      } catch (err) {
+        console.warn("Could not save image to Firestore:", err.message);
       }
-
-      await db.collection("threads").doc(threadId).collection("messages").add({
-        role: "user",
-        content: `/image ${prompt}`,
-        timestamp: new Date().toISOString(),
-      });
-
-      await db.collection("threads").doc(threadId).collection("messages").add({
-        role: "assistant",
-        content: `Generated image for: "${prompt}"`,
-        imageUrl,
-        isImage: true,
-        timestamp: new Date().toISOString(),
-        persona: "general",
-      });
-
-      await db.collection("threads").doc(threadId).update({
-        updatedAt: new Date().toISOString(),
-      });
     }
 
-    res.json({ ok: true, imageUrl, prompt });
+    res.json({ ok: true, imageUrl, prompt: prompt.trim() });
 
   } catch (error) {
     console.error("❌ Image generation error:", error.message);
@@ -96,6 +103,8 @@ router.post("/image", async (req, res) => {
 router.post("/chat", async (req, res) => {
   try {
     const { message, threadId, persona = "general", model = "smart" } = req.body;
+    const isGuest = Boolean(req.user?.isGuest);
+    const userId = req.user?.uid;
 
     if (message?.trim().startsWith("/image")) {
       res.setHeader("Content-Type", "text/event-stream");
@@ -106,12 +115,20 @@ router.post("/chat", async (req, res) => {
       return res.end();
     }
 
-    const userId = req.user.uid;
     if (!message?.trim()) return res.status(400).json({ error: "Message is required" });
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+
+    if (isGuest) {
+      // Stream guest chat directly without Firestore
+      const history = [{ role: "user", content: message }];
+      const result = await getChatResponse(history, persona, model);
+      res.write(`data: ${JSON.stringify({ chunk: result.content })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      return res.end();
+    }
 
     let currentThreadId = threadId;
 

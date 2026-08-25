@@ -52,7 +52,8 @@ const buildAnchorDownload = (filename, content) => {
 
 // ✅ Auth guard wrapper
 function AuthGate({ children }) {
-  const [user, setUser]       = useState(undefined); // undefined = loading
+  const [user, setUser]         = useState(undefined); // undefined = loading
+  const [isGuest, setIsGuest]   = useState(() => localStorage.getItem("sigmagpt_guest") === "true");
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -63,6 +64,11 @@ function AuthGate({ children }) {
     return unsubscribe;
   }, []);
 
+  const handleContinueAsGuest = () => {
+    localStorage.setItem("sigmagpt_guest", "true");
+    setIsGuest(true);
+  };
+
   if (checking) {
     return (
       <div className="authLoading">
@@ -72,7 +78,9 @@ function AuthGate({ children }) {
     );
   }
 
-  if (!user) return <Login />;
+  if (!user && !isGuest) {
+    return <Login onContinueAsGuest={handleContinueAsGuest} />;
+  }
 
   return children;
 }
@@ -84,13 +92,21 @@ function AppShell() {
   const fileInputRef          = useRef(null);
   const themeRippleTimerRef   = useRef(null);
 
-  // ✅ Current Firebase user
+  // ✅ Current Firebase / Guest user
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
+  const [isGuest, setIsGuest] = useState(() => !auth.currentUser && localStorage.getItem("sigmagpt_guest") === "true");
 
   useEffect(() => {
-    const unsubscribe = onAuthChange(setCurrentUser);
+    const unsubscribe = onAuthChange((u) => {
+      setCurrentUser(u);
+      if (u) {
+        setIsGuest(false);
+        localStorage.removeItem("sigmagpt_guest");
+      }
+    });
     return unsubscribe;
   }, []);
+
 
   const storedSettings = useMemo(() => getSettings(), []);
   const [allThreads, setAllThreads]               = useState(() => listChats());
@@ -223,7 +239,16 @@ function AppShell() {
 
   // ✅ Handle sign out
   const handleSignOut = async () => {
-    try { await logOut(); } catch {}
+    try {
+      localStorage.removeItem("sigmagpt_guest");
+      setIsGuest(false);
+      await logOut();
+      window.location.reload();
+    } catch {
+      localStorage.removeItem("sigmagpt_guest");
+      setIsGuest(false);
+      window.location.reload();
+    }
   };
 
   useEffect(() => {
@@ -284,8 +309,10 @@ function AppShell() {
 
   const providerValues = {
     // Auth
-    currentUser,
+    currentUser: currentUser || (isGuest ? { isGuest: true, displayName: "Guest User", email: "guest@sigmagpt.local" } : null),
+    isGuest,
     handleSignOut,
+
 
     // Chat
     prompt, setPrompt,

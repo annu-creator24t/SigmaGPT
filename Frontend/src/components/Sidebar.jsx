@@ -126,12 +126,23 @@ function Sidebar() {
   const [isLoading, setIsLoading]       = useState(false);
   const renameInputRef = useRef(null);
 
-  // ✅ Fetch threads from Firestore
+  // ✅ Fetch threads (Firestore for logged in, localStorage for guests)
   const fetchThreads = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = await getIdToken();
-      if (!token) { setThreads([]); setIsLoading(false); return; }
+      if (!token || currentUser?.isGuest) {
+        // Load local threads for guests
+        const localChats = listChats();
+        setThreads(localChats.map(c => ({
+          threadId: c.id,
+          title: c.title,
+          pinned: Boolean(c.pinned),
+          updatedAt: c.updatedAt || c.createdAt,
+        })));
+        setIsLoading(false);
+        return;
+      }
 
       const res = await fetch(THREADS_URL, {
         headers: { Authorization: `Bearer ${token}` },
@@ -141,25 +152,29 @@ function Sidebar() {
       const data = await res.json();
       setThreads(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Fetch threads error:", err);
-      setThreads([]);
+      console.warn("Fetch threads fallback to local store:", err.message);
+      const localChats = listChats();
+      setThreads(localChats.map(c => ({
+        threadId: c.id,
+        title: c.title,
+        pinned: Boolean(c.pinned),
+        updatedAt: c.updatedAt || c.createdAt,
+      })));
     }
     setIsLoading(false);
-  }, []);
+  }, [currentUser?.isGuest]);
 
-  // ✅ Fetch on mount + whenever currThreadId changes (new chat was created)
- useEffect(() => { fetchThreads(); }, []);
-// ✅ ADD THIS SEPARATELY — refetch when new chat created
-const prevThreadIdRef = useRef(currThreadId);
-useEffect(() => {
-  // Only refetch if a genuinely NEW thread was created
-  if (prevThreadIdRef.current !== currThreadId) {
-    prevThreadIdRef.current = currThreadId;
-    // Small delay to let Firestore propagate
-    const timer = setTimeout(() => fetchThreads(), 800);
-    return () => clearTimeout(timer);
-  }
-}, [currThreadId]);
+  useEffect(() => { fetchThreads(); }, [fetchThreads]);
+
+  const prevThreadIdRef = useRef(currThreadId);
+  useEffect(() => {
+    if (prevThreadIdRef.current !== currThreadId) {
+      prevThreadIdRef.current = currThreadId;
+      const timer = setTimeout(() => fetchThreads(), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [currThreadId, fetchThreads]);
+
   // ✅ Focus rename input
   useEffect(() => {
     if (renamingId && renameInputRef.current) {
@@ -178,60 +193,71 @@ useEffect(() => {
     if (isMobile) setIsSidebarOpen(false);
   };
 
-const handleDelete = async (e, threadId) => {
-  e.stopPropagation();
-  e.preventDefault();
-  
-  // Optimistic update first
-  setThreads(prev => prev.filter(t => t.threadId !== threadId));
+  const handleDelete = async (e, threadId) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Optimistic update
+    setThreads(prev => prev.filter(t => t.threadId !== threadId));
 
-  try {
-    const token = await getIdToken();
-    const res = await fetch(THREAD_URL(threadId), {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error();
-    toast.success("Chat deleted!");
-    if (threadId === currThreadId) startNewChat();
-  } catch {
-    toast.error("Delete failed!");
-    fetchThreads(); // only rollback on error
-  }
-};
+    try {
+      const token = await getIdToken();
+      if (!token || currentUser?.isGuest) {
+        deleteChat(threadId);
+        toast.success("Chat deleted!");
+        if (threadId === currThreadId) startNewChat();
+        return;
+      }
+
+      const res = await fetch(THREAD_URL(threadId), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Chat deleted!");
+      if (threadId === currThreadId) startNewChat();
+    } catch {
+      deleteChat(threadId);
+      toast.success("Chat deleted!");
+      if (threadId === currThreadId) startNewChat();
+    }
+  };
 
   const handlePin = async (e, threadId) => {
-  e.stopPropagation();
-  e.preventDefault();
+    e.stopPropagation();
+    e.preventDefault();
 
-  const thread = threads.find(t => t.threadId === threadId);
-  const newPinned = !thread?.pinned;
+    const thread = threads.find(t => t.threadId === threadId);
+    const newPinned = !thread?.pinned;
 
-  // Optimistic update
-  setThreads(prev =>
-    prev.map(t => t.threadId === threadId ? { ...t, pinned: newPinned } : t)
-  );
-
-  try {
-    const token = await getIdToken();
-    const res = await fetch(`${THREAD_URL(threadId)}/pin`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error();
-    const data = await res.json();
+    // Optimistic update
     setThreads(prev =>
-      prev.map(t => t.threadId === threadId ? { ...t, pinned: data.pinned } : t)
+      prev.map(t => t.threadId === threadId ? { ...t, pinned: newPinned } : t)
     );
-    toast.success(data.pinned ? "📌 Pinned!" : "Unpinned!");
-  } catch {
-    toast.error("Pin failed!");
-    // ✅ Revert — don't refetch!
-    setThreads(prev =>
-      prev.map(t => t.threadId === threadId ? { ...t, pinned: !newPinned } : t)
-    );
-  }
-};
+
+    try {
+      const token = await getIdToken();
+      if (!token || currentUser?.isGuest) {
+        togglePinned(threadId);
+        toast.success(newPinned ? "📌 Pinned!" : "Unpinned!");
+        return;
+      }
+
+      const res = await fetch(`${THREAD_URL(threadId)}/pin`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setThreads(prev =>
+        prev.map(t => t.threadId === threadId ? { ...t, pinned: data.pinned } : t)
+      );
+      toast.success(data.pinned ? "📌 Pinned!" : "Unpinned!");
+    } catch {
+      togglePinned(threadId);
+      toast.success(newPinned ? "📌 Pinned!" : "Unpinned!");
+    }
+  };
 
   // ✅ Start rename
   const handleStartRename = (e, thread) => {
@@ -242,43 +268,54 @@ const handleDelete = async (e, threadId) => {
   };
 
   const handleRename = async (threadId) => {
-  const newTitle = renameValue.trim();
-  const oldTitle = threads.find(t => t.threadId === threadId)?.title || "";
-  if (!newTitle) { setRenamingId(null); return; }
+    const newTitle = renameValue.trim();
+    const oldTitle = threads.find(t => t.threadId === threadId)?.title || "";
+    if (!newTitle) { setRenamingId(null); return; }
 
-  // Optimistic update
-  setThreads(prev =>
-    prev.map(t => t.threadId === threadId ? { ...t, title: newTitle } : t)
-  );
-  setRenamingId(null);
-
-  if (threadId === currThreadId && updateCurrentChatTitle) {
-    updateCurrentChatTitle(threadId, newTitle);
-  }
-
-  try {
-    const token = await getIdToken();
-    const res = await fetch(`${THREAD_URL(threadId)}/rename`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ title: newTitle }),
-    });
-    if (!res.ok) throw new Error();
-    toast.success("Renamed!");
-  } catch {
-    toast.error("Rename failed!");
-    // ✅ Revert — don't refetch!
+    // Optimistic update
     setThreads(prev =>
-      prev.map(t => t.threadId === threadId ? { ...t, title: oldTitle } : t)
+      prev.map(t => t.threadId === threadId ? { ...t, title: newTitle } : t)
     );
-  }
-};
+    setRenamingId(null);
 
-  // ✅ Sign out
-  const handleSignOut = async () => {
-    try { await logOut(); toast.success("Signed out!"); }
-    catch { toast.error("Sign out failed!"); }
+    if (threadId === currThreadId && updateCurrentChatTitle) {
+      updateCurrentChatTitle(threadId, newTitle);
+    }
+
+    try {
+      const token = await getIdToken();
+      if (!token || currentUser?.isGuest) {
+        renameChat(threadId, newTitle);
+        toast.success("Renamed!");
+        return;
+      }
+
+      const res = await fetch(`${THREAD_URL(threadId)}/rename`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Renamed!");
+    } catch {
+      renameChat(threadId, newTitle);
+      toast.success("Renamed!");
+    }
   };
+
+  // ✅ Sign out / Exit Guest
+  const handleSignOut = async () => {
+    try {
+      localStorage.removeItem("sigmagpt_guest");
+      await logOut();
+      toast.success("Signed out!");
+      window.location.reload();
+    } catch {
+      localStorage.removeItem("sigmagpt_guest");
+      window.location.reload();
+    }
+  };
+
 
   // ✅ Filter + split
   const filtered = threads.filter(t =>
@@ -435,10 +472,21 @@ const handleDelete = async (e, threadId) => {
         </div>
 
         {currentUser && (
-          <p className="userEmail">{currentUser.displayName || currentUser.email}</p>
+          <div className="userInfoBlock">
+            {currentUser.isGuest ? (
+              <div className="guestBadgeRow">
+                <span className="guestPill">Guest Mode</span>
+                <button className="guestSignInLink" onClick={handleSignOut}>
+                  Sign In
+                </button>
+              </div>
+            ) : (
+              <p className="userEmail">{currentUser.displayName || currentUser.email}</p>
+            )}
+          </div>
         )}
 
-        <p className="poweredBy">Powered by Groq ⚡</p>
+        <p className="poweredBy">Powered by Groq ⚡ & Pollinations AI</p>
       </div>
     </aside>
   );

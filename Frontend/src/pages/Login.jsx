@@ -6,9 +6,10 @@ import {
   registerWithEmail,
   resendVerificationEmail,
 } from "../utils/firebase.js";
+import { Sparkles, UserCheck } from "lucide-react";
+import toast from "react-hot-toast";
 
-
-function Login() {
+function Login({ onContinueAsGuest }) {
   const [isRegister, setIsRegister]         = useState(false);
   const [email, setEmail]                   = useState("");
   const [password, setPassword]             = useState("");
@@ -22,8 +23,9 @@ function Login() {
     setLoading(true);
     try {
       await signInWithGoogle();
+      toast.success("Signed in with Google!");
     } catch (err) {
-      setError("Google sign-in failed. Try again.");
+      setError(err?.message || "Google sign-in failed. Try again.");
     }
     setLoading(false);
   };
@@ -40,8 +42,10 @@ function Login() {
       if (isRegister) {
         await registerWithEmail(email, password);
         setVerificationSent(true); // ✅ Show verification message
+        toast.success("Verification email sent!");
       } else {
         await signInWithEmail(email, password);
+        toast.success("Welcome back!");
       }
     } catch (err) {
       const messages = {
@@ -53,7 +57,7 @@ function Login() {
         "auth/invalid-credential":  "Invalid email or password.",
         "auth/email-not-verified":  "Please verify your email before signing in. Check your inbox!",
       };
-      setError(messages[err.code] || "Authentication failed. Try again.");
+      setError(messages[err.code] || err.message || "Authentication failed. Try again.");
     }
     setLoading(false);
   };
@@ -63,7 +67,7 @@ function Login() {
     setResending(true);
     try {
       await resendVerificationEmail(email, password);
-      toast && toast.success("Verification email sent!");
+      toast.success("Verification email sent!");
       setError("");
     } catch {
       setError("Failed to resend. Try again.");
@@ -120,7 +124,24 @@ function Login() {
           Continue with Google
         </button>
 
-        <div className="loginDivider"><span>or</span></div>
+        {/* Guest access button */}
+        <button
+          type="button"
+          className="guestBtn"
+          onClick={() => {
+            if (onContinueAsGuest) onContinueAsGuest();
+            else {
+              localStorage.setItem("sigmagpt_guest", "true");
+              window.location.reload();
+            }
+          }}
+          disabled={loading}
+        >
+          <Sparkles size={16} className="guestIcon" />
+          <span>Continue as Guest</span>
+        </button>
+
+        <div className="loginDivider"><span>or with email</span></div>
 
         {/* Email form */}
         <form onSubmit={handleEmailAuth} className="loginForm">
@@ -171,7 +192,7 @@ function Login() {
           </button>
         </p>
 
-        <p className="loginFooter">Powered by Groq ⚡ · Free forever</p>
+        <p className="loginFooter">Powered by Groq ⚡ & Pollinations AI · Free forever</p>
       </div>
     </div>
   );

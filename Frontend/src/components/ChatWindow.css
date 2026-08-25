@@ -166,6 +166,131 @@
   flex-shrink: 0;
 }
 
+/* ── Image mode indicator bar ── */
+.imageSettingsBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 760px;
+  margin: 0 auto 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(234, 88, 12, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 20px;
+  color: #f59e0b;
+  font-size: 0.76rem;
+  font-weight: 500;
+  animation: slideInDown 0.2s ease;
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Command suggestions popup ── */
+.commandSuggestionsPopup {
+  max-width: 760px;
+  margin: 0 auto 8px;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  animation: popUp 0.18s ease;
+  z-index: 50;
+}
+
+@keyframes popUp {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.suggestionsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.suggestionsHeader kbd {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.68rem;
+  margin: 0 2px;
+}
+
+.suggestionsList {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.suggestionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  gap: 10px;
+}
+
+.suggestionItem:hover,
+.suggestionItem.active {
+  background: var(--accent-dim);
+}
+
+.suggestionLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestionCmd {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.suggestionBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-secondary);
+}
+
+.suggestionDesc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex: 1;
+  text-align: left;
+}
+
+.suggestionEnterIcon {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.suggestionItem:hover .suggestionEnterIcon,
+.suggestionItem.active .suggestionEnterIcon {
+  opacity: 1;
+  color: var(--accent);
+}
+
 /* ── Input area ── */
 .inputArea {
   width: 100%;
@@ -173,6 +298,7 @@
   flex-shrink: 0;
   border-top: 1px solid var(--border);
   background: var(--bg-main);
+  position: relative;
 }
 
 .inputBox {
@@ -189,10 +315,16 @@
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   box-sizing: border-box;
 }
+
 .inputBox:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
   transform: translateY(-1px);
+}
+
+.inputBox.imageMode {
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
 }
 
 .chatTextarea {
@@ -253,11 +385,17 @@
 }
 .sendBtn.active { background: var(--accent); color: #fff; }
 .sendBtn.active:hover { background: var(--accent-hover); transform: translateY(-1px) scale(1.04); }
+.sendBtn.imageSendBtn.active {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
 .sendBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
 /* ── Input hint ── */
 .inputHint {
   text-align: center;
+
   font-size: 0.68rem;
   color: var(--text-secondary);
   margin: 6px auto 0;

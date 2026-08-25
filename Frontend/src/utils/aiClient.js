@@ -107,3 +107,6 @@ export const requestChatReply = (messages, persona, model) =>
 
 export const requestChatTitle = (message) =>
   postJson("/api/chat/title", { message });
+
+export const requestImageGeneration = (prompt, threadId) =>
+  postJson("/api/chat/image", { prompt, threadId });

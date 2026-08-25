@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import "highlight.js/styles/github-dark.css";
-import { Copy, Check, Volume2, VolumeX, User, Bot, Code2, PenLine, Lightbulb, GraduationCap, Download, ImageOff } from "lucide-react";
+import { Copy, Check, Volume2, VolumeX, User, Bot, Code2, PenLine, Lightbulb, GraduationCap, Download, ImageOff, Image as ImageIcon, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 
 const PERSONA_ICONS = {
@@ -72,12 +72,11 @@ function ImageMessage({ chat }) {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.href     = url;
-      a.download = `sigmagpt-image-${Date.now()}.png`;
+      a.download = `sigmagpt-art-${Date.now()}.png`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Image downloaded!");
     } catch {
-      // fallback — open in new tab
       window.open(chat.imageUrl, "_blank");
     }
   };
@@ -86,7 +85,7 @@ function ImageMessage({ chat }) {
     return (
       <div className="imageGenerating">
         <div className="imageSpinner" />
-        <p>Generating your image...</p>
+        <p>🎨 Generating your image with Pollinations AI...</p>
       </div>
     );
   }
@@ -95,7 +94,10 @@ function ImageMessage({ chat }) {
     return (
       <div className="imageError">
         <ImageOff size={24} />
-        <p>Image failed to load</p>
+        <p>Image could not be rendered.</p>
+        <button className="retryImageBtn" onClick={() => { setImgError(false); setImgLoaded(false); }}>
+          Retry
+        </button>
       </div>
     );
   }
@@ -105,7 +107,7 @@ function ImageMessage({ chat }) {
       {!imgLoaded && (
         <div className="imageGenerating">
           <div className="imageSpinner" />
-          <p>Loading image...</p>
+          <p>Loading high quality image...</p>
         </div>
       )}
       <img
@@ -115,13 +117,19 @@ function ImageMessage({ chat }) {
         style={{ display: imgLoaded ? "block" : "none" }}
         onLoad={() => setImgLoaded(true)}
         onError={() => setImgError(true)}
+        loading="lazy"
       />
       {imgLoaded && (
         <div className="imageActions">
           <span className="imageCaption">{chat.content}</span>
-          <button className="imageDownloadBtn" onClick={handleDownload} title="Download image">
-            <Download size={14} /> Download
-          </button>
+          <div className="imageBtnRow">
+            <button className="imageDownloadBtn" onClick={() => window.open(chat.imageUrl, "_blank")} title="Open in new tab">
+              <ExternalLink size={13} /> Open
+            </button>
+            <button className="imageDownloadBtn primary" onClick={handleDownload} title="Download image">
+              <Download size={13} /> Save Image
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -164,7 +172,6 @@ function Message({ chat, isStreaming }) {
         {isUser ? (
           <p className="userText">{chat.content}</p>
         ) : chat.isImage ? (
-          // ✅ Render image message
           <ImageMessage chat={chat} />
         ) : (
           <div className="markdownBody">
@@ -208,10 +215,10 @@ function Message({ chat, isStreaming }) {
 }
 
 const QUICK_PROMPTS = [
-  { icon: <Code2 size={18} />,     title: "Write code",      desc: "Write a Python function that..." },
-  { icon: <Lightbulb size={18} />, title: "Explain simply",  desc: "Explain quantum computing simply" },
-  { icon: <PenLine size={18} />,   title: "Write for me",    desc: "Help me draft an email to..." },
-  { icon: <Bot size={18} />,       title: "Solve a problem", desc: "How do I debug this error..." },
+  { icon: <ImageIcon size={18} />,  title: "Generate AI Art", desc: "/image a breathtaking cyberpunk city with neon lights at sunset" },
+  { icon: <Code2 size={18} />,      title: "Write code",      desc: "Write a Python script to analyze and summarize JSON data" },
+  { icon: <Lightbulb size={18} />,  title: "Explain simply",  desc: "Explain quantum computing and superposition in simple terms" },
+  { icon: <PenLine size={18} />,    title: "Draft content",   desc: "Help me write a persuasive project introduction email" },
 ];
 
 function Chat({ onQuickPrompt }) {
@@ -224,7 +231,7 @@ function Chat({ onQuickPrompt }) {
           <span className="emptySigma">Σ</span>
           <span className="emptyName">igmaGPT</span>
         </div>
-        <p className="emptyTagline">Your intelligent AI assistant — fast, free, powerful.</p>
+        <p className="emptyTagline">Your intelligent AI assistant — fast, intelligent, and free forever.</p>
         <div className="quickPrompts">
           {QUICK_PROMPTS.map((q, i) => (
             <button key={i} className="quickCard" onClick={() => onQuickPrompt?.(q.desc)}>
@@ -234,10 +241,11 @@ function Chat({ onQuickPrompt }) {
             </button>
           ))}
         </div>
-        <p className="imageHint">💡 Type <kbd>/image</kbd> followed by a description to generate images</p>
+        <p className="imageHint">💡 Type <kbd>/image</kbd> or <kbd>draw a...</kbd> to generate AI art on demand</p>
       </div>
     );
   }
+
 
   return (
     <div className="chatMessages">

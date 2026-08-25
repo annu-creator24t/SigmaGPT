@@ -96,6 +96,39 @@
   height: 18px;
 }
 
+/* ── Guest button ── */
+.guestBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(59, 130, 246, 0.15));
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  color: #f3f4f6;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s, box-shadow 0.18s;
+  margin-bottom: 20px;
+}
+
+.guestBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(59, 130, 246, 0.3));
+  border-color: #a78bfa;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.25);
+}
+
+.guestBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.guestIcon {
+  color: #fbbf24;
+}
+
+
 /* ── Divider ── */
 .loginDivider {
   display: flex;
