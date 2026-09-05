@@ -3,6 +3,7 @@ import "dotenv/config";
 import cors from "cors";
 import chatRoutes from "./routes/chat.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { telemetry } from "./utils/telemetry.js";
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -27,6 +28,17 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: "1mb" }));
+
+// Public metrics endpoint
+app.get("/api/metrics", async (req, res) => {
+  try {
+    const snapshot = await telemetry.getSnapshot();
+    res.json(snapshot);
+  } catch (err) {
+    res.status(500).json({ error: "Could not retrieve metrics" });
+  }
+});
+
 app.use("/api/chat", authMiddleware, chatRoutes);
 
 app.get("/", (req, res) => {
@@ -43,4 +55,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Server error" });
 });
 
-app.listen(PORT, () => console.log(`Server on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server on port ${PORT}`));

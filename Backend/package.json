@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "benchmark": "node scripts/benchmark.js",
+    "metrics": "node scripts/generateFigures.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

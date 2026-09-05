@@ -1,0 +1,276 @@
+{
+  "summary": {
+    "totalRuns": 18,
+    "successfulRuns": 17,
+    "successRatePct": 94.4,
+    "ttft": {
+      "avgMs": 505,
+      "p50Ms": 443,
+      "p90Ms": 761,
+      "minMs": 180,
+      "maxMs": 783
+    },
+    "latency": {
+      "avgMs": 1454,
+      "p50Ms": 855,
+      "p90Ms": 2531,
+      "minMs": 595,
+      "maxMs": 4195
+    },
+    "tokens": {
+      "totalTokens": 14683,
+      "promptTokens": 6837,
+      "completionTokens": 7846,
+      "avgTokensPerRun": 864
+    },
+    "modelBreakdown": [
+      {
+        "modelKey": "fast",
+        "modelName": "openai/gpt-oss-20b",
+        "runs": 6,
+        "avgTtftMs": 378,
+        "avgLatencyMs": 727
+      },
+      {
+        "modelKey": "smart",
+        "modelName": "openai/gpt-oss-120b",
+        "runs": 6,
+        "avgTtftMs": 427,
+        "avgLatencyMs": 1360
+      },
+      {
+        "modelKey": "balanced",
+        "modelName": "groq/compound",
+        "runs": 5,
+        "avgTtftMs": 760,
+        "avgLatencyMs": 2441
+      }
+    ],
+    "timestamp": "2026-09-05T05:30:34.634Z"
+  },
+  "details": [
+    {
+      "success": true,
+      "model": "fast",
+      "modelName": "openai/gpt-oss-20b",
+      "persona": "general",
+      "prompt": "Explain binary search in 2 sentences.",
+      "ttftMs": 491,
+      "totalDurationMs": 608,
+      "promptTokens": 95,
+      "completionTokens": 123,
+      "totalTokens": 218,
+      "tokensPerSec": 202.3
+    },
+    {
+      "success": true,
+      "model": "fast",
+      "modelName": "openai/gpt-oss-20b",
+      "persona": "coder",
+      "prompt": "Write a short JavaScript debounce function.",
+      "ttftMs": 426,
+      "totalDurationMs": 741,
+      "promptTokens": 89,
+      "completionTokens": 376,
+      "totalTokens": 465,
+      "tokensPerSec": 507.4
+    },
+    {
+      "success": true,
+      "model": "fast",
+      "modelName": "openai/gpt-oss-20b",
+      "persona": "explainer",
+      "prompt": "Summarize the key benefits of caching in web systems.",
+      "ttftMs": 352,
+      "totalDurationMs": 687,
+      "promptTokens": 92,
+      "completionTokens": 300,
+      "totalTokens": 392,
+      "tokensPerSec": 436.7
+    },
+    {
+      "success": true,
+      "model": "fast",
+      "modelName": "openai/gpt-oss-20b",
+      "persona": "mentor",
+      "prompt": "Give 3 tips on optimizing database query performance.",
+      "ttftMs": 443,
+      "totalDurationMs": 976,
+      "promptTokens": 90,
+      "completionTokens": 485,
+      "totalTokens": 575,
+      "tokensPerSec": 496.9
+    },
+    {
+      "success": true,
+      "model": "fast",
+      "modelName": "openai/gpt-oss-20b",
+      "persona": "writer",
+      "prompt": "Draft a concise 2-sentence release announcement for a new feature.",
+      "ttftMs": 180,
+      "totalDurationMs": 752,
+      "promptTokens": 95,
+      "completionTokens": 515,
+      "totalTokens": 610,
+      "tokensPerSec": 684.8
+    },
+    {
+      "success": true,
+      "model": "fast",
+      "modelName": "openai/gpt-oss-20b",
+      "persona": "general",
+      "totalDurationMs": 595,
+      "promptTokens": 95,
+      "completionTokens": 164,
+      "totalTokens": 259,
+      "tokensPerSec": 275.6
+    },
+    {
+      "success": true,
+      "model": "smart",
+      "modelName": "openai/gpt-oss-120b",
+      "persona": "general",
+      "prompt": "Explain binary search in 2 sentences.",
+      "ttftMs": 550,
+      "totalDurationMs": 743,
+      "promptTokens": 95,
+      "completionTokens": 92,
+      "totalTokens": 187,
+      "tokensPerSec": 123.8
+    },
+    {
+      "success": true,
+      "model": "smart",
+      "modelName": "openai/gpt-oss-120b",
+      "persona": "coder",
+      "prompt": "Write a short JavaScript debounce function.",
+      "ttftMs": 435,
+      "totalDurationMs": 2398,
+      "promptTokens": 89,
+      "completionTokens": 948,
+      "totalTokens": 1037,
+      "tokensPerSec": 395.3
+    },
+    {
+      "success": true,
+      "model": "smart",
+      "modelName": "openai/gpt-oss-120b",
+      "persona": "explainer",
+      "prompt": "Summarize the key benefits of caching in web systems.",
+      "ttftMs": 407,
+      "totalDurationMs": 1282,
+      "promptTokens": 92,
+      "completionTokens": 438,
+      "totalTokens": 530,
+      "tokensPerSec": 341.7
+    },
+    {
+      "success": true,
+      "model": "smart",
+      "modelName": "openai/gpt-oss-120b",
+      "persona": "mentor",
+      "prompt": "Give 3 tips on optimizing database query performance.",
+      "ttftMs": 263,
+      "totalDurationMs": 2331,
+      "promptTokens": 90,
+      "completionTokens": 994,
+      "totalTokens": 1084,
+      "tokensPerSec": 426.4
+    },
+    {
+      "success": true,
+      "model": "smart",
+      "modelName": "openai/gpt-oss-120b",
+      "persona": "writer",
+      "prompt": "Draft a concise 2-sentence release announcement for a new feature.",
+      "ttftMs": 481,
+      "totalDurationMs": 604,
+      "promptTokens": 95,
+      "completionTokens": 108,
+      "totalTokens": 203,
+      "tokensPerSec": 178.8
+    },
+    {
+      "success": true,
+      "model": "smart",
+      "modelName": "openai/gpt-oss-120b",
+      "persona": "general",
+      "totalDurationMs": 799,
+      "promptTokens": 95,
+      "completionTokens": 117,
+      "totalTokens": 212,
+      "tokensPerSec": 146.4
+    },
+    {
+      "success": true,
+      "model": "balanced",
+      "modelName": "groq/compound",
+      "persona": "general",
+      "prompt": "Explain binary search in 2 sentences.",
+      "ttftMs": 746,
+      "totalDurationMs": 2531,
+      "promptTokens": 1055,
+      "completionTokens": 671,
+      "totalTokens": 1726,
+      "tokensPerSec": 265.1
+    },
+    {
+      "success": true,
+      "model": "balanced",
+      "modelName": "groq/compound",
+      "persona": "coder",
+      "prompt": "Write a short JavaScript debounce function.",
+      "ttftMs": 783,
+      "totalDurationMs": 4195,
+      "promptTokens": 2128,
+      "completionTokens": 1272,
+      "totalTokens": 3400,
+      "tokensPerSec": 303.2
+    },
+    {
+      "success": true,
+      "model": "balanced",
+      "modelName": "groq/compound",
+      "persona": "explainer",
+      "prompt": "Summarize the key benefits of caching in web systems.",
+      "ttftMs": 761,
+      "totalDurationMs": 2456,
+      "promptTokens": 1195,
+      "completionTokens": 661,
+      "totalTokens": 1856,
+      "tokensPerSec": 269.1
+    },
+    {
+      "success": false,
+      "model": "balanced",
+      "modelName": "groq/compound",
+      "persona": "mentor",
+      "error": "Request Entity Too Large",
+      "totalDurationMs": 7792
+    },
+    {
+      "success": true,
+      "model": "balanced",
+      "modelName": "groq/compound",
+      "persona": "writer",
+      "prompt": "Draft a concise 2-sentence release announcement for a new feature.",
+      "ttftMs": 751,
+      "totalDurationMs": 855,
+      "promptTokens": 279,
+      "completionTokens": 102,
+      "totalTokens": 381,
+      "tokensPerSec": 119.3
+    },
+    {
+      "success": true,
+      "model": "balanced",
+      "modelName": "groq/compound",
+      "persona": "general",
+      "totalDurationMs": 2167,
+      "promptTokens": 1068,
+      "completionTokens": 480,
+      "totalTokens": 1548,
+      "tokensPerSec": 221.5
+    }
+  ]
+}

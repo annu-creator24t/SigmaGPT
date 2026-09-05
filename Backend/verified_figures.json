@@ -1,0 +1,45 @@
+{
+  "system": "SigmaGPT",
+  "generatedAt": "2026-09-05T05:34:35.112Z",
+  "databaseAndUsers": {
+    "totalRegisteredUsers": 23,
+    "verifiedEmailUsers": 13,
+    "totalConversationThreads": 20,
+    "totalCloudMessages": 98,
+    "pinnedThreads": 0,
+    "avgMessagesPerConversation": 4.9
+  },
+  "performanceAndInference": {
+    "benchmarkSuccessRate": "94.4%",
+    "avgTimeToFirstTokenMs": 505,
+    "p50TimeToFirstTokenMs": 443,
+    "p90TimeToFirstTokenMs": 761,
+    "avgFullResponseLatencyMs": 1454,
+    "p50FullResponseLatencyMs": 855,
+    "totalTokensBenchmarked": 14683,
+    "avgTokensPerQuery": 864,
+    "modelBreakdown": [
+      {
+        "modelKey": "fast",
+        "modelName": "openai/gpt-oss-20b",
+        "runs": 6,
+        "avgTtftMs": 378,
+        "avgLatencyMs": 727
+      },
+      {
+        "modelKey": "smart",
+        "modelName": "openai/gpt-oss-120b",
+        "runs": 6,
+        "avgTtftMs": 427,
+        "avgLatencyMs": 1360
+      },
+      {
+        "modelKey": "balanced",
+        "modelName": "groq/compound",
+        "runs": 5,
+        "avgTtftMs": 760,
+        "avgLatencyMs": 2441
+      }
+    ]
+  }
+}

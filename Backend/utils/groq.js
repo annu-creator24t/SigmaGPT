@@ -9,11 +9,11 @@ const client = new OpenAI({
   baseURL: "https://api.groq.com/openai/v1",
 });
 
-// ✅ Models
+// ✅ Models (Active high-throughput models on Groq)
 export const MODELS = {
-  fast: "llama-3.1-8b-instant",
-  smart: "llama-3.3-70b-versatile",
-  balanced: "gemma2-9b-it",
+  fast: "openai/gpt-oss-20b",
+  smart: "openai/gpt-oss-120b",
+  balanced: "groq/compound",
 };
 
 // ✅ Personas
@@ -60,8 +60,9 @@ const normalizeTitle = (title) => {
     .join(" ") || "New chat";
 };
 
-// ✅ Chat response
+// ✅ Chat response (non-streaming) with token & latency tracking
 export const getChatResponse = async (messages, persona = "general", model = "smart") => {
+  const startTime = Date.now();
   try {
     const selectedPersona = PERSONAS[persona] || PERSONAS.general;
     const selectedModel = MODELS[model] || MODELS.smart;
@@ -73,18 +74,60 @@ export const getChatResponse = async (messages, persona = "general", model = "sm
         ...cleanMessages(messages),
       ],
       temperature: 0.7,
+      max_tokens: 1024,
     });
+
+    const latencyMs = Date.now() - startTime;
+    const usage = response.usage || {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    };
 
     return {
       content: response.choices[0]?.message?.content || "",
       persona: selectedPersona.name,
+      personaKey: persona,
       model: selectedModel,
+      modelKey: model,
+      usage: {
+        promptTokens: usage.prompt_tokens || 0,
+        completionTokens: usage.completion_tokens || 0,
+        totalTokens: usage.total_tokens || 0,
+      },
+      latencyMs,
     };
 
   } catch (error) {
     console.error("❌ Groq Error:", error.message);
     throw new Error("AI response failed");
   }
+};
+
+// ✅ Chat response (streaming) with usage options and chunk generator
+export const getChatStream = async (messages, persona = "general", model = "smart") => {
+  const selectedPersona = PERSONAS[persona] || PERSONAS.general;
+  const selectedModel = MODELS[model] || MODELS.smart;
+
+  const stream = await client.chat.completions.create({
+    model: selectedModel,
+    messages: [
+      { role: "system", content: selectedPersona.prompt },
+      ...cleanMessages(messages),
+    ],
+    temperature: 0.7,
+    max_tokens: 1024,
+    stream: true,
+    stream_options: { include_usage: true },
+  });
+
+  return {
+    stream,
+    persona: selectedPersona.name,
+    personaKey: persona,
+    model: selectedModel,
+    modelKey: model,
+  };
 };
 
 // ✅ Title generation
@@ -109,4 +152,4 @@ export const generateChatTitle = async (message) => {
 // ✅ Debug
 console.log("GROQ KEY:", process.env.GROQ_API_KEY ? "Loaded ✅" : "Missing ❌");
 
-export default client;
+export default client;
